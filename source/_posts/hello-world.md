@@ -44,4 +44,6 @@ $ hexo deploy
 
 More info: [Deployment](https://hexo.io/docs/deployment.html)
 
-![图片测试](../images/IMG_4872.jpg)
+![](/images/IMG_4872.JPG)
+
+## zubiaoti
