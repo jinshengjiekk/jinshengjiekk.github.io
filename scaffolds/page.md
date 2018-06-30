@@ -1,5 +1,5 @@
 ---
 title: {{ title }}
 date: {{ date }}
-comment: false
+comments: false
 ---

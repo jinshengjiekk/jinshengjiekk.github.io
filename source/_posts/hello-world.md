@@ -1,5 +1,6 @@
 ---
 title: Hello World
+comments: false
 tags:
 - 123
 - 234
@@ -33,7 +34,7 @@ More info: [Server](https://hexo.io/docs/server.html)
 ``` bash
 $ hexo generate
 ```
-
+<!--more-->
 More info: [Generating](https://hexo.io/docs/generating.html)
 
 ### Deploy to remote sites
