@@ -1,6 +1,7 @@
 ---
 title: 景
 comments: false
+type: post
 ---
 
 

@@ -1,11 +1,9 @@
 ---
 title: 人文
 comments: false
-type: post
+type: page
 ---
 
-![](gallery/hf_WestLake.jpg)
-![](gallery/self_jump.jpg)
 ![](gallery/kangshanming_cq_bridge.jpg)
 ![](gallery/kangshanming_black_cq.jpg)
 ![](gallery/chuyuancheng_cq.jpg)
