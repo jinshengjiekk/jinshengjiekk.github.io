@@ -19,7 +19,7 @@
 <meta property="og:site_name" content="JSJ&#39;s Blog">
 <meta property="og:description" content="translate by jin.shengjie   摘要　　本篇论文介绍对支持并行程序Java框架的设计，具体实现和性能效率，所谓的并行程序就是将问题（递归）分解成多个并行解决的子任务，等待这些子任务的完成并组合最终的结果。这种通用设计是为Cilk编程语言设计的工作窃取框架的一种变种。 其中主要的实现技巧是围绕着有效的构建和管理任务队列和工作线程。 性能结果表明好的并行方式能够让多数程序加速执">
 <meta property="og:locale" content="zh-CN">
-<meta property="og:updated_time" content="2018-07-02T17:45:29.329Z">
+<meta property="og:updated_time" content="2018-07-03T18:09:37.685Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="A Java Fork&#x2F;Join Framework(译文)">
 <meta name="twitter:description" content="translate by jin.shengjie   摘要　　本篇论文介绍对支持并行程序Java框架的设计，具体实现和性能效率，所谓的并行程序就是将问题（递归）分解成多个并行解决的子任务，等待这些子任务的完成并组合最终的结果。这种通用设计是为Cilk编程语言设计的工作窃取框架的一种变种。 其中主要的实现技巧是围绕着有效的构建和管理任务队列和工作线程。 性能结果表明好的并行方式能够让多数程序加速执">
@@ -281,7 +281,16 @@
 </ol>
 </blockquote>
 <h1 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h1><p>　　这个框架用了大约800行存java代码来实现，主要都在FJTaskRunner这个类当中，它是<code>java.lang.Thread</code>的子类。 <code>FJTasks</code>本身仅仅包含了完成状态及时通过委托他们当前工作线程来执行其他操作。<code>FJTaskRunnerGroup</code>类用来构建工作线程，维护一些共享状态以及帮组协调启动和关闭。<br>更过的实现文档在<code>util.concurrent</code>包中可以获得。本节内容仅仅讨论实现这个框架过程中遇到的问题和解决方案，问题包含： 支持有效的双端队列操作（<code>push</code>,<code>pop</code>,<code>take</code>）； 管理线程获取新任务的偷窃协议。</p>
-<h2 id="双端队列"><a href="#双端队列" class="headerlink" title="双端队列"></a>双端队列</h2><p>　　为了有效和可扩展性执行任务，任务管理必须被设计的尽可能的快。创建，推送以及后来的获取（不常发生的偷窃）任务和顺序执行程序的过程调用一样都是需要开销的。更少的开销能够让程序员采取更小的任务粒度，更小的任务粒度反过来又能获得好的并行性。<br>任务分配本身是JVM的责任。 java垃圾收集器允许我们创建一个特殊目的的内存分配器来维护任务。 如此一来，相比通过其他语言来实现<code>FJTasks</code>，通过java语言来实现将会大幅减少复杂度和代码量。<br>双端队列的基本结构是通过单数组来构建的普通结构，每个双端队列有两个索引； <code>top</code> 索引的行为就像一个基于数组栈指示器，做<code>push</code>和<code>pop</code>操作的时候会改变该值。 <code>base</code>索引只有<code>take</code>操作的时候才会改变。</p>
+<h2 id="双端队列"><a href="#双端队列" class="headerlink" title="双端队列"></a>双端队列</h2><p>　　为了有效和可扩展性执行任务，任务管理必须被设计的尽可能的快。创建，推送以及后来的获取（不常发生的偷窃）任务和顺序执行程序的过程调用一样都是需要开销的。更少的开销能够让程序员采取更小的任务粒度，更小的任务粒度反过来又能获得好的并行性。<br>任务分配本身是JVM的责任。 java垃圾收集器允许我们创建一个特殊目的的内存分配器来维护任务。 如此一来，相比通过其他语言来实现<code>FJTasks</code>，通过java语言来实现将会大幅减少复杂度和代码量。<br>双端队列的基本结构是通过单数组来构建的普通结构，每个双端队列有两个索引； <code>top</code> 索引的行为就像一个基于数组栈指示器，做<code>push</code>和<code>pop</code>操作的时候会改变该值。 <code>base</code>索引只有<code>take</code>操作的时候才会改变。由于<code>FJTaskRunner</code>里面的操作都是和双端队列里面的细节紧密相关的（比如，<code>fork</code>就是简单的调用<code>push</code>操作），所以双端队列这个数据机构就嵌套在这个类当中，而不是独立一个组件。<br>　　由于双端队列这个数组会同时被多个线程访问，有时候还不能完全具有同步机制，又由于一个独立的JAVA数组元素不能被申明成<code>volatile</code>，所以每个数组元素实际上一个固定的引用，这个引用对象维护着一个<code>volatile</code>引用。 当初做出这个决定主要是为了兼容JAVA内存规则，但是这种间接的引用最后被证明在测试平台上能够提高性能，推测起来大概是由于访问附近元素减少了缓存竞争，而这种附近元素的分布由于间接引用的关系在内存变得更加均匀。<br>　　实现双端队列的主要困难围绕了同步机制和同步机制的终止。即使在已经优化过同步机制设施的JVM上，为每个<code>push</code>和<code>pop</code>操作获取锁都会成为一个瓶颈。 然而，在Cilk语言中采用策略的改版提供了一个解决办法，这个解决办法基于以下几个准则：</p>
+<blockquote>
+<ul>
+<li><code>push</code>和<code>pop</code>操作只能有拥有者线程来触发</li>
+<li>通过在<code>take</code>操作上加上进入锁，很容易在同一时刻限制只有偷窃线程来执行<code>take</code>操作。（必要时，双端队列的锁也能禁用<code>take</code>操作） 因此，冲突控制的问题就缩小为两个部分的同步机制问题了</li>
+<li>只有在双端队列即将要变空的情况下，<code>pop</code>和<code>take</code>操作才会有冲突。其他情况下，都能保证这两个操作是在相互独立的元素上进行操作的</li>
+</ul>
+</blockquote>
+<p>　　如果双端队列里面确保多于一个元素的话，将<code>pop</code>和<code>base</code>这两个索引定义为<code>volatile</code>变量能够保证<code>pop</code>和<code>take</code>这两个操作不需要加锁。这是通过一种类似于戴克斯特拉算法来做到的，在这种算法当中， <code>push</code>会提前递减<code>top</code>变量：<code>if (--top &gt;= base) ...</code>以及<code>take</code>会提前增加<code>base</code>变量：<code>if(++base &lt; top) ...</code><br>在这两个情况下，必须要在随后比较这两个索引来判断操作是否会导致双端队列为空。一个部队称的规则被用来处理潜在的冲突： <code>pop</code>操作会再检查状态并且在获得了双端队列锁之后继续操作（这把锁也是<code>take</code>操作需要持有的锁）, 只有在双端队列真的为空的情况下，<code>pop</code>操作才会回退。相反， <code>take</code>操作会立即回退，通常来说他们会去尝试从其他的队列中去偷窃任务。这种不对称也是和Cilk语言中的协议差别最大的一点。？？？<br>　　除非双端队列将要溢出，否则<code>volatile</code>变量索引的使用使得在做<code>push</code>操作的时候也不需要同步机制。如果双端队列真的将要溢出，<code>push</code>操作必须要获取到双端队列锁来进行扩容数组。否则，简单的确保只有在双端队列数组在<code>take</code>操作的时候被填满时才去更新。
+　　</p>
 
       
     </div>
